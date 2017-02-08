@@ -17,8 +17,9 @@
 # along with Labelme.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 #from PyQt4.QtOpenGL import *
 
 from shape import Shape
@@ -107,7 +108,7 @@ class Canvas(QWidget):
 
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""
-        pos = self.transformPos(ev.posF())
+        pos = self.transformPos(ev.localPos())
 
         self.restoreCursor()
 
@@ -191,7 +192,7 @@ class Canvas(QWidget):
             self.hVertex, self.hShape = None, None
 
     def mousePressEvent(self, ev):
-        pos = self.transformPos(ev.posF())
+        pos = self.transformPos(ev.localPos())
         if ev.button() == Qt.LeftButton:
             if self.drawing():
                 if self.current:
@@ -477,7 +478,7 @@ class Canvas(QWidget):
         return super(Canvas, self).minimumSizeHint()
 
     def wheelEvent(self, ev):
-        if ev.orientation() == Qt.Vertical:
+        if not ev.inverted():
             mods = ev.modifiers()
             if Qt.ControlModifier == int(mods):
                 self.zoomRequest.emit(ev.delta())
