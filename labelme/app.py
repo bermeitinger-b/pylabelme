@@ -19,6 +19,7 @@
 # along with Labelme.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import argparse
 import os.path
 import re
 import sys
@@ -30,16 +31,15 @@ from collections import defaultdict
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 
-import resources
-
-from lib import struct, newAction, newIcon, addActions, fmtShortcut
-from shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
-from canvas import Canvas
-from zoomWidget import ZoomWidget
-from labelDialog import LabelDialog
-from colorDialog import ColorDialog
-from labelFile import LabelFile, LabelFileError
-from toolBar import ToolBar
+from labelme import resources
+from labelme.lib import struct, newAction, newIcon, addActions, fmtShortcut
+from labelme.shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
+from labelme.canvas import Canvas
+from labelme.zoomWidget import ZoomWidget
+from labelme.labelDialog import LabelDialog
+from labelme.colorDialog import ColorDialog
+from labelme.labelFile import LabelFile, LabelFileError
+from labelme.toolBar import ToolBar
 
 
 __appname__ = 'labelme'
@@ -83,7 +83,7 @@ class WindowMixin(object):
 class MainWindow(QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = range(3)
 
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, output=None):
         super(MainWindow, self).__init__()
         self.setWindowTitle(__appname__)
 
@@ -305,6 +305,8 @@ class MainWindow(QMainWindow, WindowMixin):
         # Application state.
         self.image = QImage()
         self.filename = filename
+        self.labeling_once = output is not None
+        self.output = output
         self.recentFiles = []
         self.maxRecent = 7
         self.lineColor = None
@@ -761,8 +763,12 @@ class MainWindow(QMainWindow, WindowMixin):
     def saveFile(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
         if self.hasLabels():
-            self._saveFile(self.filename if self.labelFile\
-                                         else self.saveFileDialog())
+            if self.labelFile:
+                self._saveFile(self.filename)
+            elif self.output:
+                self._saveFile(self.output)
+            else:
+                self.saveFileDialog()
 
     def saveFileAs(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
@@ -777,17 +783,20 @@ class MainWindow(QMainWindow, WindowMixin):
         dlg.setAcceptMode(QFileDialog.AcceptSave)
         dlg.setConfirmOverwrite(True)
         dlg.setOption(QFileDialog.DontUseNativeDialog, False)
-        if dlg.exec_():
-            return dlg.selectedFiles()[0]
-        return ''
-        #return unicode(QFileDialog.getSaveFileName(self,
-        #    '%s - Choose File', self.currentPath(),
-        #    'Label files (*%s)' % LabelFile.suffix))
+        basename = os.path.splitext(self.filename)[0]
+        default_labelfile_name = os.path.join(self.currentPath(),
+                                              basename + LabelFile.suffix)
+        filename = dlg.getSaveFileName(
+            self, 'Choose File', default_labelfile_name,
+            'Label files (*%s)' % LabelFile.suffix)
+        return unicode(filename)
 
     def _saveFile(self, filename):
         if filename and self.saveLabels(filename):
             self.addRecentFile(filename)
             self.setClean()
+            if self.labeling_once:
+                self.close()
 
     def closeFile(self, _value=False):
         if not self.mayContinue():
@@ -914,15 +923,20 @@ def read(filename, default=None):
         return default
 
 
-def main(argv):
+def main():
     """Standard boilerplate Qt application code."""
-    app = QApplication(argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename', default=None, help='image or label filename')
+    parser.add_argument('-O', '--output', help='output label name')
+    args = parser.parse_args()
+
+    filename = args.filename
+    output = args.output
+
+    app = QApplication(sys.argv)
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon("app"))
-    win = MainWindow(argv[1] if len(argv) == 2 else None)
+    win = MainWindow(filename, output)
     win.show()
-    return app.exec_()
-
-if __name__ == '__main__':
-    sys.exit(main(sys.argv))
-
+    win.raise_()
+    sys.exit(app.exec_())
