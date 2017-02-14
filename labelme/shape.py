@@ -24,6 +24,7 @@ from PyQt4.QtCore import *
 
 from lib import distance
 
+import copy
 # TODO:
 # - [opt] Store paths instead of creating new ones at each paint.
 
@@ -77,7 +78,22 @@ class Shape(object):
         self._closed = True
 
     def addPoint(self, point):
-        if self.points and point == self.points[0]:
+        # hack to make a box on the second point
+        if self.points:
+            pointA=self.points[0]
+
+            pointB = copy.deepcopy(point)
+            pointB.setY(pointA.y())
+            self.points.append(pointB)
+
+            self.points.append(point)
+
+            pointC=copy.deepcopy(point)
+            pointC.setX(pointA.x())
+            self.points.append(pointC)
+
+            pointD = copy.deepcopy(pointA)
+            self.points.append(pointD)
             self.close()
         else:
             self.points.append(point)
