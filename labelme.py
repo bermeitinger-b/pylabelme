@@ -19,6 +19,7 @@
 # along with Labelme.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os
 import os.path
 import re
 import sys
@@ -32,7 +33,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
-import resources
+# import resources
 
 from lib import struct, newAction, newIcon, addActions, fmtShortcut
 from shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
@@ -243,6 +244,12 @@ class MainWindow(QMainWindow, WindowMixin):
         labels.setText('Show/Hide Label Panel')
         labels.setShortcut('Ctrl+Shift+L')
 
+        prevPic = action('&Previous Picture', self.moveToPrevPic,
+                'PgUp', 'prev-pic', u'Move to previous picture', enabled=True)
+
+        nextPic = action('&Next Picture', self.moveToNextPic,
+                'PgDown', 'next-pic', u'Move to next picture', enabled=True)
+
         # Lavel list context menu.
         labelMenu = QMenu()
         addActions(labelMenu, (edit, delete))
@@ -261,9 +268,9 @@ class MainWindow(QMainWindow, WindowMixin):
                 fileMenuActions=(open,save,saveAs,close,quit),
                 beginner=(), advanced=(),
                 editMenu=(edit, copy, delete, None, color1, color2),
-                beginnerContext=(create, edit, copy, delete),
+                beginnerContext=(create, edit, copy, delete, prevPic, nextPic),
                 advancedContext=(createMode, editMode, edit, copy,
-                    delete, shapeLineColor, shapeFillColor),
+                    delete, shapeLineColor, shapeFillColor, prevPic, nextPic),
                 onLoadActive=(close, create, createMode, editMode),
                 onShapesPresent=(saveAs, hideAll, showAll))
 
@@ -354,6 +361,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.updateFileMenu()
         # Since loading the file may take some time, make sure it runs in the background.
         self.queueEvent(partial(self.loadFile, self.filename))
+        self.queueEvent(partial(self.setWorkingDirAndCurrentFilename, self.filename))
 
         # Callbacks:
         self.zoomWidget.valueChanged.connect(self.paintCanvas)
@@ -752,7 +760,9 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadRecent(self, filename):
         if self.mayContinue():
-            self.loadFile(filename)
+            fileLoaded = self.loadFile(filename)
+            if fileLoaded:
+                self.setWorkingDirAndCurrentFilename(filename)
 
     def openFile(self, _value=False):
         if not self.mayContinue():
@@ -766,7 +776,15 @@ class MainWindow(QMainWindow, WindowMixin):
         filename = unicode(QFileDialog.getOpenFileName(self,
              '%s - Choose Image or Label file' % __appname__, path,filters)[0])
         if filename:
-            self.loadFile(filename)
+            fileLoaded = self.loadFile(filename)
+            if fileLoaded:
+                self.setWorkingDirAndCurrentFilename(filename)
+
+    def setWorkingDirAndCurrentFilename(self, filepath):
+        if filepath is None:
+            filepath = unicode(self.settings['filename'])
+        self.workingDir = os.path.dirname(filepath)
+        self.currentFilename = os.path.basename(filepath)
 
     def saveFile(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
@@ -887,6 +905,44 @@ class MainWindow(QMainWindow, WindowMixin):
     def moveShape(self):
         self.canvas.endMove(copy=False)
         self.setDirty()
+
+    def getFiles(self, currFilename):
+        path = self.workingDir
+        unsortedFiles = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+        formats = ['%s' % unicode(fmt).lower() for fmt in QImageReader.supportedImageFormats()]
+        unsortedImageFiles = [f for f in unsortedFiles if unicode(os.path.splitext(f)[1][1:]).lower() in formats]
+        files = sorted(unsortedImageFiles)
+        findex = files.index(currFilename)
+        prevFilename = None
+        if findex - 1 >= 0:
+            prevFilename = files[findex - 1]
+        nextFilename = None
+        if findex + 1 < len(files):
+            nextFilename = files[findex + 1]
+        return prevFilename, nextFilename
+
+    def moveToPrevPic(self):
+        if not self.mayContinue():
+            return
+        prevFilename = self.getFiles(self.currentFilename)[0]
+        if prevFilename is not None:
+            self.loadFile(os.path.join(self.workingDir, prevFilename))
+            self.currentFilename = prevFilename
+        else:
+            #TODO warning
+            # maybe disable previous picture action
+            pass
+
+    def moveToNextPic(self):
+        if not self.mayContinue():
+            return
+        nextFilename = self.getFiles(self.currentFilename)[1]
+        if nextFilename is not None:
+            self.loadFile(os.path.join(self.workingDir, nextFilename))
+            self.currentFilename = nextFilename
+        else:
+            #TODO warning
+            pass
 
 
 class Settings(object):
