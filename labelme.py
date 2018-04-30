@@ -27,8 +27,10 @@ import subprocess
 from functools import partial
 from collections import defaultdict
 
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
+import PyQt5
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 
 import resources
 
@@ -92,6 +94,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self._noSelectionSlot = False
         self._beginner = True
+        self.saveDir = "/Users/vashishtmadhavan/Documents/Research/AltLabels/Coarse/"
         self.screencastViewer = "firefox"
         self.screencast = "screencast.ogv"
 
@@ -315,8 +318,8 @@ class MainWindow(QMainWindow, WindowMixin):
         # XXX: Could be completely declarative.
         # Restore application settings.
         types = {
-            'filename': QString,
-            'recentFiles': QStringList,
+            'filename': str,
+            'recentFiles': list,
             'window/size': QSize,
             'window/position': QPoint,
             'window/geometry': QByteArray,
@@ -337,9 +340,15 @@ class MainWindow(QMainWindow, WindowMixin):
         Shape.line_color = self.lineColor
         Shape.fill_color = self.fillColor
 
-        if settings.get('advanced', QVariant()).toBool():
+        adv = settings.get('advanced',QVariant())
+        if adv == QVariant and adv.value():
             self.actions.advancedMode.setChecked(True)
-            self.toggleAdvancedMode()
+            self.toggleAdvancedMode
+
+        else:
+            if adv:
+                self.actions.advancedMode.setChecked(True)
+                self.toggleAdvancedmode
 
         # Populate the File menu dynamically.
         self.updateFileMenu()
@@ -508,7 +517,8 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             shape = self.canvas.selectedShape
             if shape:
-                self.labelList.setItemSelected(self.shapesToItems[shape], True)
+                #self.labelList.setCurrentItem(self.shapesToItems[shape], True)
+                self.labelList.setCurrentItem(self.shapesToItems[shape])
             else:
                 self.labelList.clearSelection()
         self.actions.delete.setEnabled(selected)
@@ -727,7 +737,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if not self.mayContinue():
             event.ignore()
         s = self.settings
-        s['filename'] = self.filename if self.filename else QString()
+        s['filename'] = self.filename if self.filename else ''
         s['window/size'] = self.size()
         s['window/position'] = self.pos()
         s['window/state'] = self.saveState()
@@ -754,15 +764,18 @@ class MainWindow(QMainWindow, WindowMixin):
         filters = "Image & Label files (%s)" % \
                 ' '.join(formats + ['*%s' % LabelFile.suffix])
         filename = unicode(QFileDialog.getOpenFileName(self,
-            '%s - Choose Image or Label file' % __appname__, path, filters))
+             '%s - Choose Image or Label file' % __appname__, path,filters)[0])
         if filename:
             self.loadFile(filename)
 
     def saveFile(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
         if self.hasLabels():
-            self._saveFile(self.filename if self.labelFile\
-                                         else self.saveFileDialog())
+            saveFileName = self.saveDir + self.filename.split('/')[-1].split('.')[0] + '.json'
+            #self._saveFile(self.filename if self.labelFile\
+            #                             else self.saveFileDialog())
+            self._saveFile(saveFileName)
+
 
     def saveFileAs(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
@@ -896,8 +909,9 @@ class Settings(object):
     def _cast(self, key, value):
         # XXX: Very nasty way of converting types to QVariant methods :P
         t = self.types[key]
-        if t != QVariant:
-            method = getattr(QVariant, re.sub('^Q', 'to', t.__name__, count=1))
+        if t != QVariant and (t != list) and (t!= str):
+            #method = getattr(QVariant, re.sub('^Q', 'to', t.__name__, count=1))
+            method = getattr(PyQt5.QtCore, t.__name__)
             return method(value)
         return value
 
