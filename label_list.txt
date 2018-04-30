@@ -1,0 +1,9 @@
+man
+woman
+boy
+girl
+car
+bicycle
+Superman
+Ironman the rich
+

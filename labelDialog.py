@@ -32,12 +32,18 @@ class LabelDialog(QDialog):
 
     def __init__(self, text="Enter object label", parent=None):
         super(LabelDialog, self).__init__(parent)
-        self.edit = QLineEdit()
-        self.edit.setText(text)
-        self.edit.setValidator(labelValidator())
-        self.edit.editingFinished.connect(self.postProcess)
         layout = QVBoxLayout()
-        layout.addWidget(self.edit)
+        self.combo = QComboBox()
+        self.combo.setEditable(True)
+        self.combo.setAutoCompletion(True)
+        self.combo.setValidator(labelValidator())
+        self.labelCandidates = []
+        for text in open('label_list.txt', 'r').readlines():
+            t = text.strip()
+            if t != '':
+                self.combo.addItem(t)
+                self.labelCandidates.append(t)
+        layout.addWidget(self.combo) 
         self.buttonBox = bb = BB(BB.Ok | BB.Cancel, Qt.Horizontal, self)
         bb.button(BB.Ok).setIcon(newIcon('done'))
         bb.button(BB.Cancel).setIcon(newIcon('undo'))
@@ -54,10 +60,18 @@ class LabelDialog(QDialog):
         self.edit.setText(self.edit.text().lstrip().rstrip())
 
     def popUp(self, text='', move=True):
-        self.edit.setText(text)
-        self.edit.setSelection(0, len(text))
-        self.edit.setFocus(Qt.PopupFocusReason)
+        self.combo.setCurrentIndex(0)
+        self.combo.setFocus(Qt.PopupFocusReason)
         if move:
             self.move(QCursor.pos())
-        return self.edit.text() if self.exec_() else None
+        status = self.exec_()
+        if status:
+            labelText = unicode(self.combo.currentText()).strip()
+            if labelText not in self.labelCandidates:
+                self.labelCandidates.append(labelText)
+                self.combo.removeItem(self.combo.count() - 1) # remove the item that may have tailing space
+                self.combo.addItem(labelText)
+            return labelText
+        else:
+            return None
 
